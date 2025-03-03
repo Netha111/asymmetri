@@ -1,101 +1,231 @@
-import Image from "next/image";
+"use client";
+
+import {  useState } from 'react';
+import { ChatInput } from '@/components/chat/chat-input';
+import { CodePreview } from '@/components/chat/code-preview';
+import { Button } from '@/components/ui/button';
+//import { Card } from '@/components/ui/card';
+import { signOut } from 'next-auth/react';
+
+const LANDING_PAGE_TYPES = [
+  {
+    type: "Business",
+    points: [
+      "Clean and professional design",
+      "Services/Products showcase",
+      "Team section",
+      "Client testimonials",
+      "Contact information"
+    ]
+  },
+  {
+    type: "Product",
+    points: [
+      "Hero with product images",
+      "Feature highlights",
+      "Pricing plans",
+      "User testimonials",
+      "Call-to-action buttons"
+    ]
+  },
+  {
+    type: "Portfolio",
+    points: [
+      "About me section",
+      "Skills/Services",
+      "Project gallery",
+      "Work experience",
+      "Contact form"
+    ]
+  },
+  {
+    type: "SaaS",
+    points: [
+      "Feature comparison",
+      "Integration logos",
+      "Pricing tiers",
+      "Live demo section",
+      "FAQ section"
+    ]
+  }
+];
+
+// const TEMPLATE_PROMPTS = [
+//   {
+//     title: "Business Landing Page",
+//     description: "Professional layout with hero, features, and contact sections",
+//     prompt: "Create a professional business landing page with a clean design, hero section showcasing the main value proposition, features section highlighting key services, testimonials, and a contact form. Use a professional color scheme with blue and white."
+//   },
+//   {
+//     title: "Product Launch",
+//     description: "Showcase a product with features and pricing",
+//     prompt: "Generate a product launch landing page with a hero section featuring product images, key features and benefits, pricing comparison table, customer testimonials, and a prominent pre-order or buy now button. Use modern and engaging design."
+//   },
+//   {
+//     title: "Portfolio",
+//     description: "Showcase work with gallery and contact info",
+//     prompt: "Design a creative portfolio landing page with a personal introduction, skills section, project gallery showcasing work examples, and contact information. Make it minimal and elegant with good typography."
+//   }
+// ];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPrompt, setCurrentPrompt] = useState('');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handlePromptSubmit = async (prompt: string) => {
+    setCurrentPrompt(prompt);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const selectedTemplate = LANDING_PAGE_TYPES.find(t => t.type === selectedType);
+      const enhancedPrompt = selectedTemplate 
+        ? `${prompt}\n\nIncorporate these sections for ${selectedType} type:\n${selectedTemplate.points.join('\n')}`
+        : prompt;
+
+      // Include existing code if it exists
+      const payload = {
+        prompt: enhancedPrompt,
+        existingCode: generatedCode || null
+      };
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate code');
+      }
+
+      const data = await response.json();
+      setGeneratedCode(data.code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([generatedCode], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'landing-page.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleNewChat = () => {
+    setGeneratedCode('');
+    setCurrentPrompt('');
+    setSelectedType(null);
+    setError(null);
+    setIsLoading(false);
+  };
+
+  return (
+    <main className="container mx-auto p-4 min-h-screen flex flex-col">
+      <div className="flex-1">
+        <div className="flex justify-between items-center mb-8">
+          <Button 
+            onClick={handleNewChat}
+            variant="outline"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            New Chat
+          </Button>
+          <Button 
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            variant="outline"
           >
-            Read our docs
-          </a>
+            Sign Out
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        
+        <h1 className="text-4xl font-bold mb-8 text-center">Landing Page Generator</h1>
+        
+    
+        
+        {/* Templates Section */}
+        {/* <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4">Start with a Template</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {TEMPLATE_PROMPTS.map((template, index) => (
+              <Card key={index} className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => !isLoading && handlePromptSubmit(template.prompt)}>
+                <h3 className="font-semibold mb-2">{template.title}</h3>
+                <p className="text-sm text-gray-600">{template.description}</p>
+              </Card>
+            ))}
+          </div>
+        </div> */}
+
+        {/* Existing chat interface */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <ChatInput 
+              onSubmit={handlePromptSubmit} 
+              isLoading={isLoading}
+              defaultValue={currentPrompt}
+              onReset={handleNewChat}
+            />
+            {error && (
+              <div className="text-red-500 text-sm">{error}</div>
+            )}
+                <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Select Landing Page Type (Optional)</h2>
+          <div className="flex flex-wrap gap-2">
+            {LANDING_PAGE_TYPES.map((type, index) => (
+              <button
+                key={index}
+                onClick={() => setSelectedType(selectedType === type.type ? null : type.type)}
+                className={`px-4 py-2 rounded-full border transition-all ${
+                  selectedType === type.type 
+                    ? 'bg-blue-500 text-white border-blue-500' 
+                    : 'hover:border-blue-500'
+                }`}
+              >
+                {type.type}
+              </button>
+            ))}
+          </div>
+        </div>
+            {generatedCode && (
+              <Button 
+                onClick={handleDownload} 
+                className="w-full"
+                disabled={isLoading}
+              >
+                Download HTML
+              </Button>
+            )}
+
+          </div>
+          
+          <div className="border rounded-lg p-4 bg-gray-50">
+            {isLoading ? (
+              <div className="text-center text-gray-500">
+                Generating code...
+              </div>
+            ) : generatedCode ? (
+              <CodePreview code={generatedCode} />
+            ) : (
+              <div className="text-center text-gray-500">
+                Generated code will appear here
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
