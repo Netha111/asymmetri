@@ -1,7 +1,7 @@
 import { OpenAI } from 'openai';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "../auth/auth-options";
 import { prisma } from "@/lib/prisma";
 import isEmail from 'validator/lib/isEmail';
 import { ChatCompletionMessageParam } from 'openai/resources/chat';

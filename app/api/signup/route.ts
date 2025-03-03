@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const existingUser = await prisma.asymmetri.findUnique({
       where: { email }
     });
-
+    console.log("fdsfsd" ,existingUser);
     if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists' },
