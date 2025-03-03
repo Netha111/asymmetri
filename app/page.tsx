@@ -75,6 +75,36 @@ export default function Home() {
   const [currentPrompt, setCurrentPrompt] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
+  const checkStatus = async () => {
+    try {
+      const response = await fetch('/api/status');
+      if (!response.ok) throw new Error('Failed to check status');
+      
+      const data = await response.json();
+      if (data.status === 'completed' && data.code) {
+        setGeneratedCode(data.code);
+        setIsLoading(false);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Status check error:', err);
+      return false;
+    }
+  };
+
+  const pollStatus = async () => {
+    const interval = setInterval(async () => {
+      const isComplete = await checkStatus();
+      if (isComplete) {
+        clearInterval(interval);
+      }
+    }, 5000); // Check every 2 seconds
+
+    // Cleanup after 5 minutes
+    setTimeout(() => clearInterval(interval), 300000);
+  };
+
   const handlePromptSubmit = async (prompt: string) => {
     setCurrentPrompt(prompt);
     setIsLoading(true);
@@ -86,29 +116,25 @@ export default function Home() {
         ? `${prompt}\n\nIncorporate these sections for ${selectedType} type:\n${selectedTemplate.points.join('\n')}`
         : prompt;
 
-      // Include existing code if it exists
-      const payload = {
-        prompt: enhancedPrompt,
-        existingCode: generatedCode || null
-      };
-
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          prompt: enhancedPrompt,
+          existingCode: generatedCode || null
+        }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to generate code');
       }
 
-      const data = await response.json();
-      setGeneratedCode(data.code);
+      // Start polling for status
+      pollStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
       setIsLoading(false);
     }
   };

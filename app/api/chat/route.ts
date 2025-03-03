@@ -147,59 +147,24 @@ Sample example Output:
 Dont add any other text or comments in the output.
 `;
 
-export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.email || !isEmail(session.user.email)) {
-    return NextResponse.json(
-      { error: "Invalid or missing email" },
-      { status: 401 }
-    );
-  }
-
-  // Verify user exists in database
-  const user = await prisma.asymmetri.findUnique({
-    where: { email: session.user.email }
-  });
-
-  if (!user) {
-    return NextResponse.json(
-      { error: "User not found" },
-      { status: 403 }
-    );
-  }
-  
-  if(!isEmail(user?.email)){
-    return NextResponse.json(
-      { error: "Invalid or missing email" },
-      { status: 401 }
-    );
-  }
-
+async function generateCodeInBackground(email: string, prompt: string, existingCode: string | null) {
   try {
-    const { prompt, existingCode } = await req.json();
+    await prisma.asymmetri.update({
+      where: { email },
+      data: { status: 'processing' }
+    });
 
     const messages: ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content: SYSTEM_PROMPT
-      } as const
+      { role: "system", content: SYSTEM_PROMPT } as const
     ];
 
     if (existingCode) {
-      messages.push({
-        role: "assistant",
-        content: "Here's the current code:\n" + existingCode
-      } as const);
-      messages.push({
-        role: "user",
-        content: "Please modify the above code: " + prompt
-      } as const);
+      messages.push(
+        { role: "assistant", content: "Here's the current code:\n" + existingCode } as const,
+        { role: "user", content: "Please modify the above code: " + prompt } as const
+      );
     } else {
-      messages.push({
-        role: "user",
-        content: prompt
-      } as const);
+      messages.push({ role: "user", content: prompt } as const);
     }
 
     const response = await openai.chat.completions.create({
@@ -210,12 +175,46 @@ export async function POST(req: Request) {
     });
 
     const generatedCode = response.choices[0].message.content;
-    return NextResponse.json({ code: generatedCode });
+
+    await prisma.asymmetri.update({
+      where: { email },
+      data: { 
+        status:'completed',
+        code: generatedCode 
+      }
+    });
+  } catch (error) {
+    console.error('Generation error:', error);
+    await prisma.asymmetri.update({
+      where: { email },
+      data: { status: 'error' }
+    });
+  }
+}
+
+export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.email || !isEmail(session.user.email)) {
+    return NextResponse.json(
+      { error: "Invalid or missing email" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const { prompt, existingCode } = await req.json();
+
+    // Start generation in background
+    generateCodeInBackground(session.user.email, prompt, existingCode);
+
+    // Immediately return response
+    return NextResponse.json({ message: 'Generation started' });
     
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate code' },
+      { error: 'Failed to start generation' },
       { status: 500 }
     );
   }
