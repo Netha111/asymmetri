@@ -21,8 +21,9 @@ export const authOptions: AuthOptions = {
         });
         
         if (!user) {
-          return null;
+          throw new Error("User not found. Please sign up first");
         }
+        
         if(!isEmail(user?.email)){
           return null;
         }

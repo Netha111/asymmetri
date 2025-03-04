@@ -6,11 +6,9 @@ export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
-    // Check if user already exists
     const existingUser = await prisma.asymmetri.findUnique({
       where: { email }
     });
-    console.log("fdsfsd" ,existingUser);
     if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists' },
@@ -18,10 +16,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Hash password
     const hashedPassword = await hash(password, 10);
 
-    // Create new user
     const user = await prisma.asymmetri.create({
       data: {
         email,

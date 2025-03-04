@@ -99,9 +99,9 @@ export default function Home() {
       if (isComplete) {
         clearInterval(interval);
       }
-    }, 5000); // Check every 2 seconds
+    }, 5000); 
 
-    // Cleanup after 5 minutes
+    
     setTimeout(() => clearInterval(interval), 300000);
   };
 
@@ -131,7 +131,7 @@ export default function Home() {
         throw new Error('Failed to generate code');
       }
 
-      // Start polling for status
+     
       pollStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

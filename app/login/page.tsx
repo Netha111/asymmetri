@@ -27,9 +27,13 @@ export default function LoginPage() {
         password,
         redirect: false,
       });
-      console.log(result);
+    
       if (result?.error) {
-        setError("Invalid email or password");
+        if (result.error.includes("User not found")) {
+          setError("User not found. Please sign up first");
+        } else {
+          setError(result.error);
+        }
         return;
       }
 
